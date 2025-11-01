@@ -6,27 +6,19 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 type FormValues = {
-    email: string;
+    username: string;
     password: string;
 };
 
 export function AuthForm() {
     const { register, handleSubmit } = useForm<FormValues>();
     const router = useRouter();
-    const {login} = useAuthStore();
+    const { login } = useAuthStore();
 
-    const onSubmit = (data: FormValues) => {
+    const onSubmit = async (data: FormValues) => {
         console.log('Form data:', data);
         try {
-            login(data.email, data.password);
-            console.log('Login successful');
-            if ( data.email != 'admin@admin.com'|| data.password != '123123') {
-                throw new Error('Invalid email or password'); 
-            }
-            // setTimeout(() => {
-            //     router.push('/home');
-            //     console.log("login jump")
-            // }, 100);
+            await login(data.username, data.password);
             router.push('/home');
         } catch (error) { 
             console.error('Login failed:', error);
@@ -37,12 +29,12 @@ export function AuthForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4">
                 <div>
-                    <Label htmlFor="email">电子邮箱</Label>
+                    <Label htmlFor="username">用户名</Label>
                     <Input
-                        id="email"
-                        type="email"
-                        placeholder="请输入邮箱"
-                        {...register('email', { required: true })}
+                        id="username"
+                        type="text"
+                        placeholder="请输入用户名"
+                        {...register('username', { required: true })}
                     />
                 </div>
                 <div>
