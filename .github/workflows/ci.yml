@@ -30,16 +30,14 @@ jobs:
     - name: Build
       run: npm run build
 
-    - name: Upload artifact
+    - name: Create Artifact Package
+      run: tar -czf artifact.tar.gz .next public package.json package-lock.json next.config.ts
+
+    - name: Upload artifact for deployment
       uses: actions/upload-artifact@v4
       with:
-        name: nextjs-app
-        path: |
-          .next
-          public
-          package.json
-          package-lock.json
-          next.config.ts
+        name: nextjs-app-package
+        path: artifact.tar.gz
           
   deploy:
     needs: build
@@ -50,29 +48,16 @@ jobs:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: nextjs-app
+        name: nextjs-app-package
         path: .
 
-    - name: Create deployment package
-      run: tar -czf deploy.tar.gz .next public package.json package-lock.json next.config.ts
-
-    - name: Deploy to Server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        timeout: 600s
-        script: |
-          mkdir -p ${{ secrets.REMOTE_TARGET_DIR }}
-                    
     - name: Copy package to server via SCP
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.REMOTE_HOST }}
         username: ${{ secrets.REMOTE_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "deploy.tar.gz"
+        source: "artifact.tar.gz"
         target: "${{ secrets.REMOTE_TARGET_DIR }}"
 
     - name: Execute deployment commands on server
@@ -81,12 +66,13 @@ jobs:
         host: ${{ secrets.REMOTE_HOST }}
         username: ${{ secrets.REMOTE_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        timeout: 600s
         script: |
           set -e
           cd ${{ secrets.REMOTE_TARGET_DIR }}
           echo "Unpacking deployment package..."
-          tar -xzf deploy.tar.gz
-          rm deploy.tar.gz
+          tar -xzf artifact.tar.gz
+          rm artifact.tar.gz
           
           echo "Installing production dependencies..."
           npm install --omit=dev
