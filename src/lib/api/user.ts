@@ -1,4 +1,4 @@
-import { withoutAuthInstance, ResponseBody } from "./instance"
+import { withoutAuthInstance, ResponseBody, instance } from "./instance"
 
 export const login = (data: { username: string, password: string }) => 
     withoutAuthInstance.post<
@@ -25,3 +25,11 @@ export const register = (data: { username: string, password: string, email: stri
             username: string;
         }>
     >('/auth/signup', data);
+
+export const getUserProfile = () => 
+    instance.get<
+        ResponseBody<{
+            email: string;
+            username: string;
+        }>
+    >('/user/me');
