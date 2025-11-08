@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { login, register, getUserProfile } from '../api/user';
 
 type User = {
+    id: number;
     email: string;
     name: string;
 };
@@ -30,7 +31,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             const response = await getUserProfile();
             const userData = response.data.data;
-            set({ user: { name: userData.username, email: userData.email } });
+            set((state) => ({ user: { ...state.user, name: userData.username, email: userData.email } as User }));
         } catch (error) {
             console.error("Failed to fetch user profile", error);
             // If fetching profile fails, token might be invalid, so log out
@@ -42,8 +43,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     initialize: async () => {
         const storedToken = localStorage.getItem('access_token');
         const storedRefreshToken = localStorage.getItem('refresh_token');
-        if (storedToken) {
-            set({ token: storedToken, refreshToken: storedRefreshToken });
+        const storedId = localStorage.getItem('user_id');
+        if (storedToken && storedId) {
+            set({ token: storedToken, refreshToken: storedRefreshToken, user: { id: parseInt(storedId, 10) } as User });
             await get().fetchUserProfile();
         }
     },
@@ -67,11 +69,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             
             localStorage.setItem('access_token', data.accessToken);
             localStorage.setItem('refresh_token', data.refreshToken);
+            localStorage.setItem('user_id', data.id.toString());
             document.cookie = `isAuthenticated=true; path=/; expires=${new Date(Date.now() + 3600 * 1000).toUTCString()}`;
             
             set({
                 token: data.accessToken,
                 refreshToken: data.refreshToken,
+                user: { id: data.id } as User,
             });
 
             // Fetch user profile after setting the token
@@ -88,6 +92,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logout: () => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_id');
         document.cookie = 'isAuthenticated=false; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         set({ user: null, token: null, refreshToken: null, error: null });
     }
