@@ -1,18 +1,19 @@
 import { ResponseBody, instance } from "./instance";
 
 export interface StudentRequest {
-    teacherId: number;
+    studentNumber: string;
     studentName: string;
     grade: string;
     clazz: string;
 }
 
 export interface StudentResponse {
-    studentId: number;
+    id: number;
     teacherId: number;
     studentName: string;
     grade: string;
     clazz: string;
+    studentNumber: string;
 }
 
 export const getStudentsByTeacherId = (teacherId: number) =>

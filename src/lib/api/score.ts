@@ -1,17 +1,18 @@
 import { ResponseBody, instance } from "./instance"
 
 export interface ScoreUploadRequest {
-    studentId: number;
+    studentNumber: number;
     scoreValue: number;
 }
 
 export interface Score {
-    id: number;
-    studentId: number;
-    examId: number;
+    scoreId: number;
+    studentNumber: string;
+    studentName: string;
+    examName: string;
+    examSubject: string;
+    examDate: string;
     scoreValue: number;
-    studentName?: string;
-    examName?: string;
 }
 
 export const uploadScoresForExam = (examId: number, data: ScoreUploadRequest[]) => 
