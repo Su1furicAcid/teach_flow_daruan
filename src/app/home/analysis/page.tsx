@@ -162,82 +162,114 @@ export default function AnalysisPage() {
     setAverageTrendFetched(false);
   }, [averageSubject]);
 
-  const handleLoadStudentTrend = async () => {
-    if (!resolvedStudentId || !selectedSubject) {
-      setStudentTrendError("请先选择学生和科目");
-      return;
-    }
-    setStudentTrendLoading(true);
-    setStudentTrendError("");
-    try {
-      const response = await getScoresByStudent(resolvedStudentId);
-      if (response.data.code === "200") {
-        setStudentScores(response.data.data || []);
-        setStudentTrendFetched(true);
-      } else {
-        setStudentTrendError("获取成绩失败");
-        setStudentTrendFetched(false);
-      }
-    } catch (error) {
-      console.error("获取学生成绩失败", error);
-      setStudentTrendError("获取成绩失败");
-      setStudentTrendFetched(false);
-    } finally {
-      setStudentTrendLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!resolvedStudentId || !selectedSubject) return;
 
-  const handleLoadAverageTrend = async () => {
-    if (!averageSubject) {
-      setAverageError("请先选择科目");
-      return;
-    }
-    const subjectExams = exams
-      .filter((exam) => exam.examSubject === averageSubject)
-      .sort(
-        (a, b) => new Date(a.examDate).getTime() - new Date(b.examDate).getTime()
-      )
-      .slice(-MAX_POINTS);
-    if (!subjectExams.length) {
-      setAverageTrendData([]);
-      setAverageError("该科目暂无考试数据");
-      setAverageTrendFetched(false);
-      return;
-    }
-    setAverageLoading(true);
-    setAverageError("");
-    try {
-      const responses = await Promise.all(
-        subjectExams.map((exam) => getScoresByExam(exam.examId))
-      );
-      const dataset: AveragePoint[] = subjectExams.map((exam, index) => {
-        const body = responses[index].data;
-        const scores: Score[] = body.code === "200" ? body.data || [] : [];
-        const averageScore = scores.length
-          ? Number(
-              (
-                scores.reduce((sum, item) => sum + item.scoreValue, 0) /
-                scores.length
-              ).toFixed(2)
-            )
-          : 0;
-        return {
-          label: exam.examName,
-          score: averageScore,
-          date: exam.examDate,
-          examSubject: exam.examSubject,
-        };
-      });
-      setAverageTrendData(dataset);
-      setAverageTrendFetched(true);
-    } catch (error) {
-      console.error("获取平均分失败", error);
-      setAverageError("获取平均成绩失败");
-      setAverageTrendFetched(false);
-    } finally {
-      setAverageLoading(false);
-    }
-  };
+    let cancelled = false;
+    const fetchStudentTrend = async () => {
+      setStudentTrendLoading(true);
+      setStudentTrendError("");
+      try {
+        const response = await getScoresByStudent(resolvedStudentId);
+        if (cancelled) return;
+        if (response.data.code === "200") {
+          setStudentScores(response.data.data
+            .filter((score) => score.examSubject === selectedSubject)
+            .map((score) => ({
+            ...score,
+            scoreValue: Number(score.scoreValue.toFixed(2))
+          })) || []);
+          setStudentTrendFetched(true);
+        } else {
+          setStudentTrendError("获取成绩失败");
+          setStudentTrendFetched(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("获取学生成绩失败", error);
+          setStudentTrendError("获取成绩失败");
+          setStudentTrendFetched(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setStudentTrendLoading(false);
+        }
+      }
+    };
+
+    fetchStudentTrend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedStudentId, selectedSubject]);
+
+  useEffect(() => {
+    if (!averageSubject || examLoading) return;
+
+    let cancelled = false;
+    const fetchAverageTrend = async () => {
+      const subjectExams = exams
+        .filter((exam) => exam.examSubject === averageSubject)
+        .sort(
+          (a, b) => new Date(a.examDate).getTime() - new Date(b.examDate).getTime()
+        )
+        .slice(-MAX_POINTS);
+      if (!subjectExams.length) {
+        if (!cancelled) {
+          setAverageTrendData([]);
+          setAverageError("该科目暂无考试数据");
+          setAverageTrendFetched(false);
+        }
+        return;
+      }
+
+      setAverageLoading(true);
+      setAverageError("");
+      try {
+        const responses = await Promise.all(
+          subjectExams.map((exam) => getScoresByExam(exam.examId))
+        );
+        if (cancelled) return;
+        const dataset: AveragePoint[] = subjectExams.map((exam, index) => {
+          const body = responses[index].data;
+          const scores: Score[] = body.code === "200" ? body.data || [] : [];
+          const averageScore = scores.length
+            ? Number(
+                (
+                  scores.reduce((sum, item) => sum + item.scoreValue, 0) /
+                  scores.length
+                ).toFixed(2)
+              )
+            : 0;
+          return {
+            label: exam.examName,
+            score: averageScore,
+            date: exam.examDate,
+            examSubject: exam.examSubject,
+          };
+        });
+        setAverageTrendData(dataset);
+        setAverageTrendFetched(true);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("获取平均分失败", error);
+          setAverageError("获取平均成绩失败");
+          setAverageTrendFetched(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setAverageLoading(false);
+        }
+      }
+    };
+
+    fetchAverageTrend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [averageSubject, exams, examLoading]);
 
   const handleOpenUploadModal = (type: UploadType) => {
     setUploadType(type);
@@ -302,33 +334,19 @@ export default function AnalysisPage() {
                 </select>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                size="sm"
-                onClick={handleLoadStudentTrend}
-                disabled={
-                  !resolvedStudentId ||
-                  !selectedSubject ||
-                  studentTrendLoading ||
-                  !!studentsError
-                }
-              >
-                {studentTrendLoading ? "加载中..." : "加载趋势"}
-              </Button>
-              {studentTrendError && (
-                <span className="text-sm text-red-500">{studentTrendError}</span>
-              )}
-            </div>
+            {studentTrendError && (
+              <p className="text-sm text-red-500">{studentTrendError}</p>
+            )}
 
             <div className="h-72 rounded-lg bg-slate-50 p-4">
               {!resolvedStudentId || !selectedSubject ? (
-                <Placeholder text="请选择学生和科目，并点击加载趋势按钮" />
+                <Placeholder text="请选择学生和科目以查看趋势" />
               ) : studentTrendLoading ? (
                 <Placeholder text="正在加载学生成绩..." />
               ) : studentTrendError ? (
                 <Placeholder text={studentTrendError} variant="error" />
               ) : !studentTrendFetched ? (
-                <Placeholder text="点击加载趋势按钮以查看数据" />
+                <Placeholder text="条件变化后数据将自动刷新" />
               ) : !studentTrendData.length ? (
                 <Placeholder text="暂无可展示的数据" />
               ) : (
@@ -393,29 +411,19 @@ export default function AnalysisPage() {
                 ))}
               </select>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleLoadAverageTrend}
-                disabled={!averageSubject || averageLoading || examLoading}
-              >
-                {averageLoading ? "汇总中..." : "生成趋势"}
-              </Button>
-              {averageError && (
-                <span className="text-sm text-red-500">{averageError}</span>
-              )}
-            </div>
+            {averageError && (
+              <p className="text-sm text-red-500">{averageError}</p>
+            )}
 
             <div className="h-72 rounded-lg bg-slate-50 p-4">
               {!averageSubject ? (
-                <Placeholder text="请选择科目，并点击生成趋势按钮" />
+                <Placeholder text="请选择科目以查看趋势" />
               ) : averageLoading || examLoading ? (
                 <Placeholder text="正在汇总数据..." />
               ) : averageError ? (
                 <Placeholder text={averageError} variant="error" />
               ) : !averageTrendFetched ? (
-                <Placeholder text="点击生成趋势按钮以查看数据" />
+                <Placeholder text="条件变化后数据将自动刷新" />
               ) : !averageTrendData.length ? (
                 <Placeholder text="暂无平均成绩数据" />
               ) : (
